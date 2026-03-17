@@ -12,7 +12,10 @@
     "test:checkout": "playwright test tests/checkout.spec.ts",
     "test:chromium": "playwright test --project=chromium",
     "test:firefox": "playwright test --project=firefox",
-    "report": "playwright show-report"
+    "report": "playwright show-report",
+    "allure:generate": "allure generate allure-results --clean -o allure-report",
+    "allure:open": "allure open allure-report",
+    "allure:report": "npm run allure:generate && npm run allure:open"
   },
   "repository": {
     "type": "git",
@@ -24,6 +27,8 @@
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "@types/node": "^25.5.0",
+    "allure-commandline": "^2.38.0",
+    "allure-playwright": "^3.6.0",
     "typescript": "^5.9.3"
   }
 }
