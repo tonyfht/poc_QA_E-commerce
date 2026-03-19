@@ -33,6 +33,12 @@ jobs:
     name: Playwright Tests
     runs-on: ubuntu-latest
 
+    # ── PERMISOS necesarios para publicar en GitHub Pages ───────────────────
+    permissions:
+      contents: write   # leer/escribir la branch gh-pages
+      pages: write      # desplegar en GitHub Pages
+      id-token: write   # autenticación OIDC con Pages
+
     steps:
       # ── 1. Checkout ────────────────────────────────────────────────────────
       - name: Checkout
@@ -103,12 +109,41 @@ jobs:
         env:
           CI: 'true'
 
-      # ── 7. Generar reporte Allure (siempre, incluso si los tests fallan) ───
+      # ── 7. Recuperar histórico de Allure desde gh-pages ───────────────────
+      #
+      #  Flujo del histórico acumulativo:
+      #    ejecución N-1 → allure-report/history/ guardada en gh-pages
+      #    ejecución N   → copiamos ese history/ a allure-results/history/
+      #                    → allure generate lo incluye en el nuevo reporte
+      #                    → peaceiris sube el nuevo allure-report/ a gh-pages
+      #    ejecución N+1 → repite el ciclo
+      #
+      - name: Restore Allure history from gh-pages
+        if: always()
+        run: |
+          git fetch origin gh-pages --depth=1 2>/dev/null || true
+
+          if git show-ref --quiet refs/remotes/origin/gh-pages; then
+            echo "Branch gh-pages encontrada — buscando carpeta history/"
+
+            if git ls-tree origin/gh-pages history/ | grep -q .; then
+              mkdir -p allure-results
+              git archive origin/gh-pages -- history/ \
+                | tar -x -C allure-results/
+              echo "✅ Histórico de Allure restaurado desde gh-pages"
+            else
+              echo "ℹ️  No hay carpeta history/ en gh-pages todavía"
+            fi
+          else
+            echo "ℹ️  Branch gh-pages no existe aún — primera ejecución"
+          fi
+
+      # ── 8. Generar reporte Allure (siempre, incluso si los tests fallan) ───
       - name: Generate Allure report
         if: always()
         run: npm run allure:generate
 
-      # ── 8. Subir artefactos ────────────────────────────────────────────────
+      # ── 9. Subir artefactos ────────────────────────────────────────────────
       - name: Upload Allure report
         if: always()
         uses: actions/upload-artifact@v4
@@ -125,7 +160,23 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
-      # ── 9. Resumen del workflow (visible en PR y en la ejecución) ──────────
+      # ── 10. Publicar reporte Allure en GitHub Pages ────────────────────────
+      #
+      #  peaceiris/actions-gh-pages realiza un force-push de allure-report/
+      #  a la branch gh-pages. El histórico NO se pierde porque ya está
+      #  embebido dentro de allure-report/history/ (generado en el paso 8).
+      #  La próxima ejecución lo recuperará en el paso 7.
+      #
+      - name: Publish Allure report to GitHub Pages
+        if: always()
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./allure-report
+          publish_branch: gh-pages
+          commit_message: "ci: deploy Allure report [${{ github.run_number }}] (${{ github.sha }})"
+
+      # ── 11. Resumen del workflow (visible en PR y en la ejecución) ─────────
       - name: Write job summary
         if: always()
         run: |
@@ -147,10 +198,11 @@ jobs:
           **Navegador:** \`${{ steps.cfg.outputs.browser }}\`
           **Entorno:** \`${{ steps.cfg.outputs.environment }}\`
 
-          > 📦 Descarga el reporte Allure desde la sección **Artifacts** de este workflow.
+          > 📊 [Ver reporte Allure en GitHub Pages](https://tonyfht.github.io/poc_playwright/)
+          > 📦 Descarga el reporte desde la sección **Artifacts** de este workflow.
           EOF
 
-      # ── 10. Fallo global si alguna suite falló ────────────────────────────
+      # ── 12. Fallo global si alguna suite falló ────────────────────────────
       - name: Check overall result
         if: always()
         run: |
