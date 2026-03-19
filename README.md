@@ -1,5 +1,7 @@
 # PoC Playwright - Pruebas Funcionales
 
+[![Playwright Tests](https://github.com/tonyfht/poc_playwright/actions/workflows/tests.yml/badge.svg)](https://github.com/tonyfht/poc_playwright/actions/workflows/tests.yml)
+
 PoC de testing funcional con Playwright y TypeScript sobre [SauceDemo](https://www.saucedemo.com).
 
 ## Estructura del proyecto
@@ -170,6 +172,64 @@ cd "C:/Users/Toni/Desktop/Proyectos código/poc_playwright"
 npm test
 npm run allure:report
 ```
+
+---
+
+## CI/CD con GitHub Actions
+
+El proyecto incluye un workflow en `.github/workflows/tests.yml` que se ejecuta automáticamente.
+
+### Cuándo se dispara
+
+| Evento | Condición |
+|:-------|:----------|
+| `pull_request` | Cuando se modifican ficheros en `tests/**` o `src/**` |
+| `workflow_dispatch` | Ejecución manual desde GitHub Actions |
+
+### Ejecución manual (workflow_dispatch)
+
+Desde **GitHub → Actions → Playwright Tests → Run workflow** puedes elegir:
+
+- **Navegador:** `all` (por defecto), `chromium`, `firefox`, `mobile-chrome`
+- **Entorno:** `production`
+
+### Qué hace el workflow
+
+```
+1. Checkout del código
+2. Instala Node.js 20
+3. Cache de node_modules  (clave: hash de package-lock.json)
+4. npm ci
+5. Cache de navegadores Playwright  (~/.cache/ms-playwright)
+6. npx playwright install --with-deps
+7. Ejecuta cada suite por separado (continue-on-error):
+   - tests/auth.spec.ts
+   - tests/inventory.spec.ts
+   - tests/checkout.spec.ts
+8. Genera el reporte Allure  (if: always)
+9. Sube artefactos:
+   - allure-report  (30 días)
+   - playwright-report  (7 días)
+10. Escribe resumen con estado por suite en el PR
+11. Falla el job si alguna suite falló
+```
+
+### Resumen en el PR
+
+Tras cada ejecución verás una tabla como esta en el apartado **Summary** del workflow:
+
+| Suite | Estado |
+|:------|:------:|
+| Authentication | ✅ `success` |
+| Inventory | ✅ `success` |
+| Checkout | ❌ `failure` |
+
+### Descargar el reporte Allure
+
+1. Abre la ejecución del workflow en GitHub Actions
+2. Baja hasta la sección **Artifacts**
+3. Descarga `allure-report`
+4. Descomprime y abre `index.html` en el navegador
 
 ---
 
