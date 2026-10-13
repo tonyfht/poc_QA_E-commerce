@@ -1,6 +1,6 @@
 # POC — Automatización de Pruebas con Playwright
 
-[![Playwright Tests](https://github.com/tonyfht/poc_playwright/actions/workflows/tests.yml/badge.svg)](https://github.com/tonyfht/poc_playwright/actions/workflows/tests.yml)
+[![Playwright Tests](https://github.com/tonyfht/poc_QA_E-commerce/actions/workflows/tests.yml/badge.svg)](https://github.com/tonyfht/poc_QA_E-commerce/actions/workflows/tests.yml)
 [![Playwright](https://img.shields.io/badge/Playwright-1.58-45ba4b?logo=playwright)](https://playwright.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178c6?logo=typescript)](https://www.typescriptlang.org)
 [![Node](https://img.shields.io/badge/Node.js-20-339933?logo=node.js)](https://nodejs.org)
@@ -50,7 +50,7 @@ La suite contiene **28 casos de prueba** distribuidos en **8 suites** sobre **3 
 ## 2. Arquitectura del proyecto
 
 ```
-poc_playwright/
+poc_QA_E-commerce/
 │
 ├── src/                            # Código de soporte — no contiene tests
 │   │
@@ -251,8 +251,8 @@ node -v && java -version && git -v
 
 ```bash
 # 1. Clonar el repositorio
-git clone git@github.com:tonyfht/poc_playwright.git
-cd poc_playwright
+git clone git@github.com:tonyfht/poc_QA_E-commerce.git
+cd poc_QA_E-commerce
 
 # 2. Instalar dependencias de Node
 npm install
@@ -471,8 +471,8 @@ Allure 3 está escrito en Node.js: elimina el requisito de instalar Java y ofrec
 ## Configuración local rápida
 
 ```bash
-git clone git@github.com:tonyfht/poc_playwright.git
-cd poc_playwright
+git clone git@github.com:tonyfht/poc_QA_E-commerce.git
+cd poc_QA_E-commerce
 npm install && npx playwright install
 npm run demo        # tests + informe Allure (requiere Java)
 ```

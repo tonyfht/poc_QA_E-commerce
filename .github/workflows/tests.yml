@@ -217,7 +217,7 @@ jobs:
           **Navegador:** \`${{ steps.cfg.outputs.browser }}\`
           **Entorno:** \`${{ steps.cfg.outputs.environment }}\`
 
-          > 📊 [Ver reporte Allure en GitHub Pages](https://tonyfht.github.io/poc_playwright/)
+          > 📊 [Ver reporte Allure en GitHub Pages](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/)
           > 📦 Descarga el reporte desde la sección **Artifacts** de este workflow.
           EOF
 
