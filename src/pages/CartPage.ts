@@ -23,9 +23,15 @@ export class CartPage extends BasePage {
    * sí los provee para los botones de acción, pero no para el wrapper completo.
    *
    * Al trabajar con una colección (Locator de múltiples elementos), podemos
-   * usar .count() para contar y .filter() para buscar un ítem específico.
+   * usar .filter() para buscar un ítem específico.
+   *
+   * Es público (no private) para que los tests puedan usar aserciones
+   * web-first como `expect(cartPage.cartItems).toHaveCount(2)`, que reintentan
+   * hasta que el carrito termina de renderizarse. Leer `.count()` y compararlo
+   * con `expect(n).toBe(2)` toma una foto instantánea y falla de forma
+   * intermitente si la página aún no se ha pintado tras la navegación.
    */
-  private readonly cartItems: Locator;
+  readonly cartItems: Locator;
 
   /**
    * Botón "Checkout": inicia el proceso de compra.
@@ -47,16 +53,6 @@ export class CartPage extends BasePage {
     this.continueShoppingButton = page.locator(
       '[data-test="continue-shopping"]'
     );
-  }
-
-  /**
-   * Devuelve el número de líneas de producto en el carrito.
-   * Cada producto añadido ocupa una línea independiente (SauceDemo no agrupa
-   * cantidades del mismo producto), por lo que este número coincide con el
-   * número de productos distintos añadidos.
-   */
-  async getItemCount(): Promise<number> {
-    return this.cartItems.count();
   }
 
   /**
@@ -84,8 +80,10 @@ export class CartPage extends BasePage {
    * @param itemName - Nombre del producto a eliminar, tal como aparece en el carrito.
    */
   async removeItem(itemName: string): Promise<void> {
-    const item = this.cartItems.filter({ hasText: itemName });
-    await item.locator('button').click();
+    await this.step(`Quitar "${itemName}" desde el carrito`, async () => {
+      const item = this.cartItems.filter({ hasText: itemName });
+      await item.locator('button').click();
+    });
   }
 
   /**
@@ -93,7 +91,7 @@ export class CartPage extends BasePage {
    * Después de llamar a este método, la aplicación navega a '/checkout-step-one.html'.
    */
   async checkout(): Promise<void> {
-    await this.checkoutButton.click();
+    await this.step('Iniciar el checkout', () => this.checkoutButton.click());
   }
 
   /**
@@ -102,6 +100,8 @@ export class CartPage extends BasePage {
    * la compra sin perder los productos ya añadidos.
    */
   async continueShopping(): Promise<void> {
-    await this.continueShoppingButton.click();
+    await this.step('Volver al catálogo ("Continue Shopping")', () =>
+      this.continueShoppingButton.click()
+    );
   }
 }

@@ -41,8 +41,14 @@ export class LoginPage extends BasePage {
    * SauceDemo muestra un único elemento de error para todos los casos
    * (credenciales inválidas, usuario bloqueado, campos vacíos), por lo que
    * un único locator cubre todos los escenarios de error.
+   *
+   * Es público para que los tests usen aserciones web-first, que reintentan
+   * hasta que el mensaje aparece:
+   *   await expect(loginPage.errorMessage).toContainText('locked out');
+   * Leer `isVisible()` / `innerText()` y comparar después toma una foto
+   * instantánea: si el error tarda unos milisegundos en pintarse, falla.
    */
-  private readonly errorMessage: Locator;
+  readonly errorMessage: Locator;
 
   /**
    * Los locators se inicializan en el constructor, no en cada método.
@@ -68,7 +74,7 @@ export class LoginPage extends BasePage {
    * no este método.
    */
   async goto(): Promise<void> {
-    await this.navigate('/');
+    await this.step('Abrir la pantalla de login', () => this.navigate('/'));
   }
 
   /**
@@ -87,30 +93,10 @@ export class LoginPage extends BasePage {
    * @param password - Contraseña correspondiente al usuario.
    */
   async login(username: string, password: string): Promise<void> {
-    await this.usernameInput.fill(username);
-    await this.passwordInput.fill(password);
-    await this.loginButton.click();
-  }
-
-  /**
-   * Devuelve el texto del mensaje de error visible en pantalla.
-   * Se llama después de un intento de login fallido para verificar
-   * que el mensaje contiene el texto esperado según el tipo de error.
-   *
-   * Nota: SauceDemo muestra el error en el mismo elemento para todos los
-   * casos de fallo, diferenciándolos sólo por el texto del mensaje.
-   */
-  async getErrorMessage(): Promise<string> {
-    return this.errorMessage.innerText();
-  }
-
-  /**
-   * Indica si el mensaje de error está visible en el DOM.
-   * Se usa como precondición antes de leer el texto del error:
-   * primero comprobamos que existe, luego leemos su contenido.
-   * Devuelve false si el elemento no existe o está oculto.
-   */
-  async isErrorVisible(): Promise<boolean> {
-    return this.errorMessage.isVisible();
+    await this.step(`Login como "${username || '(vacío)'}"`, async () => {
+      await this.usernameInput.fill(username);
+      await this.passwordInput.fill(password);
+      await this.loginButton.click();
+    });
   }
 }

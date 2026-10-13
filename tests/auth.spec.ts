@@ -14,21 +14,26 @@
  * el propio proceso de login ES lo que se está testeando. Usar el fixture
  * autenticado no tendría sentido aquí.
  *
- * El beforeEach navega a la pantalla de login antes de cada test, garantizando
- * un punto de partida limpio e independiente entre tests.
+ * METADATOS ALLURE
+ * Cada test declara epic / feature / story / severity. Con ellos Allure
+ * rellena la pestaña "Behaviors" (árbol funcional) y permite filtrar por
+ * criticidad. `allure.tms()` enlaza con el caso de prueba en Jira.
  */
 
+import * as allure from 'allure-js-commons';
 import { test, expect } from '../src/fixtures';
 import { users } from '../src/data/users';
 
 test.describe('Authentication', () => {
   /**
    * Precondición compartida: todos los tests de esta suite parten
-   * de la pantalla de login con la página cargada y lista.
-   * Centralizar esto en beforeEach evita repetirlo en cada test y hace
-   * que el setup sea explícito y visible para quien lee la suite.
+   * de la pantalla de login. Los metadatos comunes (epic, feature, owner)
+   * se declaran aquí una sola vez para toda la suite.
    */
   test.beforeEach(async ({ loginPage }) => {
+    await allure.epic('Acceso a la aplicación');
+    await allure.feature('Autenticación');
+    await allure.owner('Equipo QA');
     await loginPage.goto();
   });
 
@@ -40,71 +45,80 @@ test.describe('Authentication', () => {
    * Se usa toHaveURL con una expresión regular para no acoplarse a la URL
    * completa (que podría cambiar de entorno), sino al fragmento significativo.
    */
-  test('should login successfully with valid credentials', async ({
+  test('should login successfully with valid credentials', { tag: '@smoke' }, async ({
     loginPage,
-    inventoryPage,
   }) => {
+    await allure.story('Login correcto');
+    await allure.severity(allure.Severity.BLOCKER);
+    await allure.tms('DEMO-1');
+
     await loginPage.login(users.standard.username, users.standard.password);
 
-    // La navegación a /inventory.html confirma que el login fue exitoso
-    // y que la sesión está activa. No es necesario verificar ningún elemento
-    // de la página — la URL es suficiente para este caso.
-    await expect(inventoryPage.page).toHaveURL(/inventory\.html/);
+    await expect(loginPage.page).toHaveURL(/inventory\.html/);
   });
 
   /**
-   * Usuario bloqueado — verificación del control de acceso por política.
+   * TESTS GUIADOS POR DATOS (data-driven) — accesos denegados.
    *
-   * Este test distingue entre "credenciales incorrectas" y "acceso denegado
-   * por política". El usuario locked_out_user tiene credenciales válidas
-   * (misma contraseña que el resto), pero su cuenta está bloqueada.
-   * La aplicación debe rechazarlo con un mensaje que lo deje claro.
+   * En lugar de escribir un test casi idéntico por cada caso de error,
+   * se define una TABLA de casos y se genera un test por fila. Añadir un
+   * caso nuevo es añadir una línea, no copiar un test entero.
    *
-   * Se verifica primero que el error ES visible, y luego que su texto
-   * CONTIENE 'locked out'. Usar .toContain() en lugar de igualdad exacta
-   * hace el test más resiliente ante cambios menores en la redacción del mensaje.
+   * En Allure, cada fila aparece como un test independiente y sus datos
+   * de entrada se muestran en la sección "Parameters" gracias a
+   * `allure.parameter()` (la contraseña se enmascara).
+   *
+   * Nota de seguridad sobre los mensajes: SauceDemo usa mensajes distintos
+   * para "usuario bloqueado" y "credenciales incorrectas". Es útil para la
+   * demo, pero en una aplicación real es una mala práctica: un mensaje
+   * diferenciado revela a un atacante que el usuario EXISTE (enumeración
+   * de usuarios). Lo recomendable es un mensaje genérico idéntico.
    */
-  test('should show error for locked out user', async ({ loginPage }) => {
-    await loginPage.login(users.locked.username, users.locked.password);
+  const deniedAccessCases = [
+    {
+      title: 'locked out user',
+      username: users.locked.username,
+      password: users.locked.password,
+      expectedError: 'Sorry, this user has been locked out.',
+      severity: allure.Severity.CRITICAL,
+    },
+    {
+      title: 'invalid credentials',
+      username: 'invalid_user',
+      password: 'wrong_password',
+      expectedError: 'Username and password do not match any user in this service',
+      severity: allure.Severity.CRITICAL,
+    },
+    {
+      title: 'empty credentials',
+      username: '',
+      password: '',
+      expectedError: 'Username is required',
+      severity: allure.Severity.NORMAL,
+    },
+    {
+      title: 'missing password',
+      username: users.standard.username,
+      password: '',
+      expectedError: 'Password is required',
+      severity: allure.Severity.NORMAL,
+    },
+  ];
 
-    expect(await loginPage.isErrorVisible()).toBe(true);
-    const error = await loginPage.getErrorMessage();
-    expect(error).toContain('locked out');
-  });
+  for (const testCase of deniedAccessCases) {
+    test(`should deny access: ${testCase.title}`, async ({ loginPage }) => {
+      await allure.story('Acceso denegado');
+      await allure.severity(testCase.severity);
+      await allure.parameter('username', testCase.username || '(vacío)');
+      await allure.parameter('password', testCase.password, { mode: 'masked' });
 
-  /**
-   * Credenciales inválidas — verificación del mensaje de error estándar.
-   *
-   * Se usan credenciales completamente inventadas ('invalid_user', 'wrong_password')
-   * para simular un intento de acceso de alguien que no tiene cuenta.
-   * Es importante que este mensaje sea diferente al del usuario bloqueado:
-   * dar el mismo mensaje en ambos casos sería un problema de seguridad
-   * (revelaría que el username existe pero está bloqueado).
-   */
-  test('should show error with invalid credentials', async ({ loginPage }) => {
-    await loginPage.login('invalid_user', 'wrong_password');
+      await loginPage.login(testCase.username, testCase.password);
 
-    expect(await loginPage.isErrorVisible()).toBe(true);
-    const error = await loginPage.getErrorMessage();
-    expect(error).toContain('Username and password do not match');
-  });
-
-  /**
-   * Campos vacíos — verificación de la validación del lado del cliente.
-   *
-   * Intentar el submit sin rellenar ningún campo debe ser interceptado
-   * por la validación del formulario antes de llegar al servidor.
-   * Se verifica que el mensaje de error indica específicamente que
-   * el username es requerido (la validación se hace campo por campo,
-   * empezando por el primero).
-   */
-  test('should show error with empty credentials', async ({ loginPage }) => {
-    await loginPage.login('', '');
-
-    expect(await loginPage.isErrorVisible()).toBe(true);
-    const error = await loginPage.getErrorMessage();
-    expect(error).toContain('Username is required');
-  });
+      // Aserción web-first: reintenta hasta que el mensaje aparece
+      await expect(loginPage.errorMessage).toContainText(testCase.expectedError);
+      await expect(loginPage.page).not.toHaveURL(/inventory\.html/);
+    });
+  }
 
   /**
    * Logout — verificación del cierre de sesión.
@@ -113,14 +127,14 @@ test.describe('Authentication', () => {
    * devuelve al usuario a la pantalla de login (URL raíz '/').
    * Este test cubre la funcionalidad completa de gestión de sesión:
    * creación (login) y destrucción (logout).
-   *
-   * La URL esperada es '/' porque la raíz de SauceDemo es siempre
-   * la pantalla de login cuando no hay sesión activa.
    */
-  test('should logout successfully', async ({
+  test('should logout successfully', { tag: '@smoke' }, async ({
     loginPage,
     inventoryPage,
   }) => {
+    await allure.story('Logout');
+    await allure.severity(allure.Severity.CRITICAL);
+
     await loginPage.login(users.standard.username, users.standard.password);
     await inventoryPage.logout();
 

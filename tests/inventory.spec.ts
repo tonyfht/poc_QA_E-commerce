@@ -16,11 +16,11 @@
  *   ✓ Añadir un producto al carrito
  *   ✓ Añadir múltiples productos al carrito
  *   ✓ Eliminar un producto del carrito
- *   ✓ Ordenación por precio ascendente
- *   ✓ Ordenación por precio descendente
- *   ✓ Ordenación por nombre alfabético
+ *   ✓ Ordenación por precio ascendente / descendente
+ *   ✓ Ordenación por nombre Z→A y A→Z
  */
 
+import * as allure from 'allure-js-commons';
 import { authenticatedTest as test, expect } from '../src/fixtures';
 
 test.describe('Inventory / Product Catalog', () => {
@@ -34,6 +34,9 @@ test.describe('Inventory / Product Catalog', () => {
    * errores confusos de "elemento no encontrado".
    */
   test.beforeEach(async ({ inventoryPage }) => {
+    await allure.epic('Compra online');
+    await allure.feature('Catálogo de productos');
+    await allure.owner('Equipo QA');
     await expect(inventoryPage.page).toHaveURL(/inventory\.html/);
   });
 
@@ -43,26 +46,27 @@ test.describe('Inventory / Product Catalog', () => {
    * Si este número cambiara, sería señal de un problema en la aplicación
    * (filtro activo, error de carga, cambio en los datos de prueba, etc.).
    */
-  test('should display 6 products', async ({ inventoryPage }) => {
-    const count = await inventoryPage.getProductCount();
-    expect(count).toBe(6);
+  test('should display 6 products', { tag: '@smoke' }, async ({ inventoryPage }) => {
+    await allure.story('Visualización del catálogo');
+    await allure.severity(allure.Severity.BLOCKER);
+
+    expect(await inventoryPage.getProductCount()).toBe(6);
   });
 
   /**
    * Verifica que añadir un producto actualiza correctamente el contador del carrito.
    *
-   * El "Sauce Labs Backpack" se eligió como producto de referencia por ser
-   * el primero de la lista en el orden por defecto — es el más predecible
-   * y menos probable de verse afectado por cambios de datos.
-   *
    * La verificación se hace sobre el badge del carrito (número visible en la UI)
    * en lugar de navegar al carrito, lo que hace este test más rápido y enfocado.
+   * `toHaveText` es web-first: reintenta hasta que el badge muestra el valor.
    */
   test('should add a product to cart', async ({ inventoryPage }) => {
+    await allure.story('Gestión del carrito desde el catálogo');
+    await allure.severity(allure.Severity.CRITICAL);
+
     await inventoryPage.addProductToCart('Sauce Labs Backpack');
 
-    const cartCount = await inventoryPage.getCartCount();
-    expect(cartCount).toBe(1);
+    await expect(inventoryPage.cartBadge).toHaveText('1');
   });
 
   /**
@@ -72,26 +76,32 @@ test.describe('Inventory / Product Catalog', () => {
    *   2. El badge muestra la suma correcta.
    */
   test('should add multiple products to cart', async ({ inventoryPage }) => {
+    await allure.story('Gestión del carrito desde el catálogo');
+    await allure.severity(allure.Severity.CRITICAL);
+
     await inventoryPage.addProductToCart('Sauce Labs Backpack');
     await inventoryPage.addProductToCart('Sauce Labs Bike Light');
 
-    const cartCount = await inventoryPage.getCartCount();
-    expect(cartCount).toBe(2);
+    await expect(inventoryPage.cartBadge).toHaveText('2');
   });
 
   /**
-   * Verifica que eliminar un producto desde el inventario reduce el contador.
+   * Verifica que eliminar un producto desde el inventario vacía el carrito.
    *
-   * El flujo es: añadir → eliminar → verificar que el carrito está vacío (0).
-   * Cuando el carrito queda vacío, el badge desaparece del DOM — getCartCount()
-   * en InventoryPage maneja este caso devolviendo 0 cuando el badge no existe.
+   * Cuando el carrito queda vacío, el badge desaparece del DOM.
+   * `toBeHidden()` se cumple tanto si el elemento está oculto como si no
+   * existe, y reintenta hasta que desaparece.
    */
   test('should remove a product from cart', async ({ inventoryPage }) => {
+    await allure.story('Gestión del carrito desde el catálogo');
+    await allure.severity(allure.Severity.NORMAL);
+
     await inventoryPage.addProductToCart('Sauce Labs Backpack');
+    await expect(inventoryPage.cartBadge).toHaveText('1');
+
     await inventoryPage.removeProductFromCart('Sauce Labs Backpack');
 
-    const cartCount = await inventoryPage.getCartCount();
-    expect(cartCount).toBe(0);
+    await expect(inventoryPage.cartBadge).toBeHidden();
   });
 
   /**
@@ -104,9 +114,10 @@ test.describe('Inventory / Product Catalog', () => {
    * getProductPrices() devuelve números (no strings con '$') precisamente para
    * poder usar .toBeGreaterThanOrEqual() sin conversiones en el test.
    */
-  test('should sort products by price low to high', async ({
-    inventoryPage,
-  }) => {
+  test('should sort products by price low to high', async ({ inventoryPage }) => {
+    await allure.story('Ordenación del catálogo');
+    await allure.severity(allure.Severity.NORMAL);
+
     await inventoryPage.sortBy('lohi');
     const prices = await inventoryPage.getProductPrices();
 
@@ -120,9 +131,10 @@ test.describe('Inventory / Product Catalog', () => {
    * Misma estrategia algorítmica que el test anterior, con la propiedad inversa:
    * cada precio debe ser <= al anterior.
    */
-  test('should sort products by price high to low', async ({
-    inventoryPage,
-  }) => {
+  test('should sort products by price high to low', async ({ inventoryPage }) => {
+    await allure.story('Ordenación del catálogo');
+    await allure.severity(allure.Severity.NORMAL);
+
     await inventoryPage.sortBy('hilo');
     const prices = await inventoryPage.getProductPrices();
 
@@ -132,23 +144,41 @@ test.describe('Inventory / Product Catalog', () => {
   });
 
   /**
-   * Verifica la ordenación alfabética de A a Z.
+   * Verifica la ordenación alfabética de Z a A.
    *
    * La estrategia: obtener los nombres tal como los devuelve la UI,
    * crear una copia ordenada con JavaScript nativo y comparar ambas.
-   * Si la UI devuelve el orden correcto, los dos arrays serán iguales.
+   * Se usa spread ([...names]) para no mutar el array original, ya que
+   * .sort() modifica el array in-place. `localeCompare` ordena como lo
+   * haría una persona (no por código Unicode).
+   */
+  test('should sort products by name Z to A', async ({ inventoryPage }) => {
+    await allure.story('Ordenación del catálogo');
+    await allure.severity(allure.Severity.NORMAL);
+
+    await inventoryPage.sortBy('za');
+    const names = await inventoryPage.getProductNames();
+
+    expect(names).toEqual([...names].sort((a, b) => b.localeCompare(a)));
+  });
+
+  /**
+   * Verifica la ordenación alfabética de A a Z.
    *
-   * Se usa spread ([...names]) para no mutar el array original al ordenarlo,
-   * ya que .sort() en JavaScript modifica el array in-place.
-   *
-   * toEqual() compara arrays elemento a elemento (igualdad profunda),
-   * a diferencia de toBe() que compara referencias.
+   * OJO — trampa habitual: el catálogo YA viene ordenado A→Z por defecto.
+   * Si sólo eligiéramos 'az' y comprobáramos el orden, el test pasaría
+   * aunque la ordenación estuviera rota. Por eso primero se fuerza el
+   * orden contrario (Z→A) y después se vuelve a A→Z: así el test sólo
+   * pasa si la ordenación realmente funciona.
    */
   test('should sort products by name A to Z', async ({ inventoryPage }) => {
+    await allure.story('Ordenación del catálogo');
+    await allure.severity(allure.Severity.NORMAL);
+
+    await inventoryPage.sortBy('za');
     await inventoryPage.sortBy('az');
     const names = await inventoryPage.getProductNames();
-    const sorted = [...names].sort();
 
-    expect(names).toEqual(sorted);
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
   });
 });

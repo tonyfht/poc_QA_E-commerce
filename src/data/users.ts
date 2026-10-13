@@ -44,8 +44,8 @@ export const users = {
    * Usuario con problemas — simula una UI rota o con bugs.
    * Al iniciar sesión con este perfil, algunas imágenes de productos aparecen
    * incorrectas y ciertos botones no funcionan como se espera.
-   * Es útil para tests que validan la robustez ante estados anómalos de la UI.
-   * (No se usa en la suite actual, disponible para expansión futura.)
+   * Se usa en tests/known-issues.spec.ts para mostrar cómo se gestionan
+   * los defectos conocidos del producto con `test.fail()`.
    */
   problem: {
     username: 'problem_user',
@@ -57,7 +57,7 @@ export const users = {
    * Las acciones tardan varios segundos de forma intencionada, lo que permite
    * testear timeouts, spinners de carga y la resiliencia de los locators
    * ante respuestas lentas.
-   * (No se usa en la suite actual, disponible para expansión futura.)
+   * Se usa en tests/performance.spec.ts para medir el tiempo de login.
    */
   performance: {
     username: 'performance_glitch_user',

@@ -12,12 +12,14 @@
  * - Al ser clase (y no interfaz), puede contener implementación real de métodos,
  *   evitando repetir el mismo código en cada subclase.
  *
- * La instancia de `Page` se declara `protected readonly`:
- * - `protected`: las subclases pueden acceder a `this.page` sin exponerlo públicamente.
+ * La instancia de `Page` se declara `readonly` (pública):
  * - `readonly`: nadie puede reasignar la referencia a la página una vez creada.
+ * - Pública: los tests la necesitan para aserciones a nivel de página como
+ *   `expect(inventoryPage.page).toHaveURL(...)`. Si fuera `protected`,
+ *   TypeScript rechazaría ese acceso (error TS2445 en `tsc --noEmit`).
  */
 
-import { Page } from '@playwright/test';
+import { Page, test } from '@playwright/test';
 
 export abstract class BasePage {
   /**
@@ -25,7 +27,25 @@ export abstract class BasePage {
    * Playwright gestiona el ciclo de vida del browser/context/page; nosotros
    * simplemente recibimos la instancia lista para usar.
    */
-  constructor(protected readonly page: Page) {}
+  constructor(readonly page: Page) {}
+
+  /**
+   * Agrupa varias acciones bajo un PASO DE NEGOCIO con nombre legible.
+   *
+   * Sin pasos, el informe (Playwright y Allure) muestra una lista plana de
+   * acciones técnicas: "fill [data-test=username]", "click [data-test=...]".
+   * Con pasos, muestra el flujo tal como lo contaría una persona:
+   *   ▸ Login como "standard_user"
+   *   ▸ Añadir "Sauce Labs Backpack" al carrito
+   *   ▸ Ir al carrito
+   *
+   * `box: true` hace que, si algo falla dentro del paso, el error se señale
+   * en la línea del TEST que llamó al Page Object, no dentro de esta clase:
+   * es donde quien lee el informe quiere mirar.
+   */
+  protected step<T>(title: string, body: () => Promise<T>): Promise<T> {
+    return test.step(title, body, { box: true });
+  }
 
   /**
    * Navega a una ruta relativa dentro de la aplicación.
@@ -39,19 +59,6 @@ export abstract class BasePage {
    */
   async navigate(path: string = ''): Promise<void> {
     await this.page.goto(path);
-  }
-
-  /**
-   * Espera a que la página esté completamente cargada.
-   *
-   * 'networkidle' significa que no hay peticiones de red activas durante
-   * al menos 500 ms. Es más robusto que 'load' (sólo espera el evento DOMContentLoaded)
-   * o 'domcontentloaded' cuando la página hace peticiones asíncronas post-carga.
-   *
-   * Uso típico: después de una navegación que desencadena llamadas a APIs.
-   */
-  async waitForPageLoad(): Promise<void> {
-    await this.page.waitForLoadState('networkidle');
   }
 
   /**

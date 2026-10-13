@@ -38,9 +38,13 @@ export class InventoryPage extends BasePage {
    * Badge numérico sobre el icono del carrito.
    * IMPORTANTE: este elemento NO existe en el DOM cuando el carrito está vacío —
    * no está oculto con display:none, directamente no se renderiza.
-   * Por eso getCartCount() debe comprobar su visibilidad antes de leer su texto.
+   *
+   * Es público para que los tests usen aserciones web-first que esperan solas:
+   *   await expect(inventoryPage.cartBadge).toHaveText('2');
+   *   await expect(inventoryPage.cartBadge).toBeHidden();   // carrito vacío
+   * `toBeHidden()` también se cumple cuando el elemento no existe en el DOM.
    */
-  private readonly cartBadge: Locator;
+  readonly cartBadge: Locator;
 
   /**
    * Selector del ordenamiento de productos.
@@ -73,6 +77,15 @@ export class InventoryPage extends BasePage {
     this.sortDropdown = page.locator('[data-test="product-sort-container"]');
     this.burgerMenu = page.locator('#react-burger-menu-btn');
     this.logoutLink = page.locator('#logout_sidebar_link');
+  }
+
+  /**
+   * Abre directamente el catálogo. Sólo funciona con una sesión activa
+   * (el fixture autenticado la inyecta vía storageState); sin sesión,
+   * SauceDemo redirige al login.
+   */
+  async goto(): Promise<void> {
+    await this.step('Abrir el catálogo', () => this.navigate('/inventory.html'));
   }
 
   /**
@@ -124,6 +137,17 @@ export class InventoryPage extends BasePage {
   }
 
   /**
+   * Devuelve el atributo `src` de la imagen de cada producto.
+   * Permite detectar el defecto conocido de `problem_user`, que muestra
+   * la MISMA imagen para todos los productos.
+   */
+  async getProductImageSources(): Promise<string[]> {
+    return this.productList
+      .locator('img.inventory_item_img')
+      .evaluateAll((imgs) => imgs.map((img) => img.getAttribute('src') ?? ''));
+  }
+
+  /**
    * Añade un producto específico al carrito buscándolo por nombre.
    *
    * .filter({ hasText: productName }) es la forma idiomática en Playwright
@@ -137,10 +161,9 @@ export class InventoryPage extends BasePage {
    * @param productName - Nombre exacto del producto tal como aparece en la UI.
    */
   async addProductToCart(productName: string): Promise<void> {
-    const product = this.productList.filter({
-      hasText: productName,
-    });
-    await product.locator('button').click();
+    await this.step(`Añadir "${productName}" al carrito`, () =>
+      this.clickProductButton(productName)
+    );
   }
 
   /**
@@ -149,7 +172,7 @@ export class InventoryPage extends BasePage {
    * SauceDemo implementa un toggle en el botón del producto: cuando el
    * producto está en el carrito, el mismo botón que decía "Add to cart"
    * pasa a decir "Remove". La interacción es idéntica (click en el botón
-   * del producto filtrado), por eso la implementación es igual a addProductToCart.
+   * del producto filtrado), por eso ambos métodos delegan en clickProductButton().
    *
    * Tener métodos con nombres distintos aunque la implementación sea igual
    * es correcto: el nombre expresa la INTENCIÓN del test, no el mecanismo.
@@ -157,27 +180,15 @@ export class InventoryPage extends BasePage {
    * @param productName - Nombre exacto del producto a eliminar del carrito.
    */
   async removeProductFromCart(productName: string): Promise<void> {
-    const product = this.productList.filter({ hasText: productName });
-    await product.locator('button').click();
+    await this.step(`Quitar "${productName}" del carrito`, () =>
+      this.clickProductButton(productName)
+    );
   }
 
-  /**
-   * Devuelve el número de productos actualmente en el carrito.
-   *
-   * El badge del carrito sólo existe en el DOM cuando hay al menos un producto.
-   * Si se intentara leer innerText() de un elemento inexistente, Playwright
-   * lanzaría un error. Por eso se comprueba primero la visibilidad:
-   *   - Si no es visible → el carrito está vacío → devuelve 0.
-   *   - Si es visible → se lee y parsea el número del badge.
-   *
-   * parseInt con base 10 es una buena práctica explícita para evitar
-   * interpretaciones en octal u otras bases en entornos legacy.
-   */
-  async getCartCount(): Promise<number> {
-    const isVisible = await this.cartBadge.isVisible();
-    if (!isVisible) return 0;
-    const text = await this.cartBadge.innerText();
-    return parseInt(text, 10);
+  /** Clic en el botón (Add to cart / Remove) del producto con ese nombre. */
+  private async clickProductButton(productName: string): Promise<void> {
+    const product = this.productList.filter({ hasText: productName });
+    await product.locator('button').click();
   }
 
   /**
@@ -199,7 +210,9 @@ export class InventoryPage extends BasePage {
   async sortBy(
     option: 'az' | 'za' | 'lohi' | 'hilo'
   ): Promise<void> {
-    await this.sortDropdown.selectOption(option);
+    await this.step(`Ordenar el catálogo por "${option}"`, () =>
+      this.sortDropdown.selectOption(option)
+    );
   }
 
   /**
@@ -207,7 +220,7 @@ export class InventoryPage extends BasePage {
    * Es la única vía de acceso al carrito desde el inventario.
    */
   async goToCart(): Promise<void> {
-    await this.cartIcon.click();
+    await this.step('Ir al carrito', () => this.cartIcon.click());
   }
 
   /**
@@ -219,7 +232,9 @@ export class InventoryPage extends BasePage {
    * de implementación de la UI.
    */
   async logout(): Promise<void> {
-    await this.burgerMenu.click();
-    await this.logoutLink.click();
+    await this.step('Cerrar sesión', async () => {
+      await this.burgerMenu.click();
+      await this.logoutLink.click();
+    });
   }
 }

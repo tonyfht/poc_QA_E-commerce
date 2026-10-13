@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "pretest": "node scripts/allure-prepare.js",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:debug": "playwright test --debug",
@@ -15,20 +16,31 @@
     "report": "playwright show-report",
     "allure:generate": "allure generate allure-results --clean -o allure-report",
     "allure:open": "allure open allure-report",
-    "allure:report": "npm run allure:generate && npm run allure:open"
+    "allure:report": "npm run allure:generate && npm run allure:open",
+    "demo": "node scripts/demo.js",
+    "demo:fail": "node scripts/demo.js --fail",
+    "test:visual:update": "playwright test tests/visual.spec.ts --update-snapshots",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
   },
   "repository": {
     "type": "git",
-    "url": "http://local_proxy@127.0.0.1:45433/git/tonyfht/poc_playwright"
+    "url": "https://github.com/tonyfht/poc_QA_E-commerce.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.58.2",
     "@types/node": "^25.5.0",
     "allure-commandline": "^2.38.0",
+    "allure-js-commons": "^3.6.0",
     "allure-playwright": "^3.6.0",
-    "typescript": "^5.9.3"
+    "eslint": "^10.12.0",
+    "eslint-plugin-playwright": "^2.12.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.71.2"
   }
 }
