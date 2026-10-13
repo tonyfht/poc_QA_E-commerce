@@ -19,6 +19,7 @@
  *   ✓ Navegación de retorno: carrito → inventario
  */
 
+import * as allure from 'allure-js-commons';
 import { authenticatedTest as test, expect } from '../src/fixtures';
 import { checkoutData } from '../src/data/users';
 
@@ -36,6 +37,9 @@ test.describe('Shopping Cart & Checkout Flow', () => {
    * como la eliminación selectiva de uno de ellos.
    */
   test.beforeEach(async ({ inventoryPage }) => {
+    await allure.epic('Compra online');
+    await allure.feature('Carrito y checkout');
+    await allure.owner('Equipo QA');
     await expect(inventoryPage.page).toHaveURL(/inventory\.html/);
     await inventoryPage.addProductToCart('Sauce Labs Backpack');
     await inventoryPage.addProductToCart('Sauce Labs Bike Light');
@@ -58,10 +62,13 @@ test.describe('Shopping Cart & Checkout Flow', () => {
     inventoryPage,
     cartPage,
   }) => {
+    await allure.story('Revisión del carrito');
+    await allure.severity(allure.Severity.CRITICAL);
+
     await inventoryPage.goToCart();
 
-    const itemCount = await cartPage.getItemCount();
-    expect(itemCount).toBe(2);
+    // toHaveCount reintenta hasta que el carrito se renderiza (aserción web-first)
+    await expect(cartPage.cartItems).toHaveCount(2);
 
     const names = await cartPage.getItemNames();
     expect(names).toContain('Sauce Labs Backpack');
@@ -79,11 +86,13 @@ test.describe('Shopping Cart & Checkout Flow', () => {
     inventoryPage,
     cartPage,
   }) => {
+    await allure.story('Revisión del carrito');
+    await allure.severity(allure.Severity.NORMAL);
+
     await inventoryPage.goToCart();
     await cartPage.removeItem('Sauce Labs Backpack');
 
-    const itemCount = await cartPage.getItemCount();
-    expect(itemCount).toBe(1);
+    await expect(cartPage.cartItems).toHaveCount(1);
   });
 
   /**
@@ -104,11 +113,15 @@ test.describe('Shopping Cart & Checkout Flow', () => {
    * La verificación del mensaje de confirmación SÍ es exacta ('Thank you for
    * your order!') porque es el indicador definitivo de que el pedido se procesó.
    */
-  test('should complete full checkout flow', async ({
+  test('should complete full checkout flow', { tag: '@smoke' }, async ({
     inventoryPage,
     cartPage,
     checkoutPage,
   }) => {
+    await allure.story('Compra completa (E2E)');
+    await allure.severity(allure.Severity.BLOCKER);
+    await allure.tms('DEMO-2');
+
     await inventoryPage.goToCart();
     await cartPage.checkout();
 
@@ -144,6 +157,9 @@ test.describe('Shopping Cart & Checkout Flow', () => {
     inventoryPage,
     cartPage,
   }) => {
+    await allure.story('Navegación del carrito');
+    await allure.severity(allure.Severity.MINOR);
+
     await inventoryPage.goToCart();
     await cartPage.continueShopping();
 

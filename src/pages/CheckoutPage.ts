@@ -88,9 +88,11 @@ export class CheckoutPage extends BasePage {
    * @param info - Datos de envío: nombre, apellido y código postal.
    */
   async fillCheckoutInfo(info: CheckoutInfo): Promise<void> {
-    await this.firstNameInput.fill(info.firstName);
-    await this.lastNameInput.fill(info.lastName);
-    await this.postalCodeInput.fill(info.postalCode);
+    await this.step('Rellenar datos de envío', async () => {
+      await this.firstNameInput.fill(info.firstName);
+      await this.lastNameInput.fill(info.lastName);
+      await this.postalCodeInput.fill(info.postalCode);
+    });
   }
 
   /**
@@ -100,7 +102,9 @@ export class CheckoutPage extends BasePage {
    * Si tiene éxito, navega a '/checkout-step-two.html'.
    */
   async continue(): Promise<void> {
-    await this.continueButton.click();
+    await this.step('Continuar al resumen del pedido', () =>
+      this.continueButton.click()
+    );
   }
 
   /**
@@ -109,7 +113,9 @@ export class CheckoutPage extends BasePage {
    * de la compra. Navega a '/checkout-complete.html'.
    */
   async finish(): Promise<void> {
-    await this.finishButton.click();
+    await this.step('Confirmar el pedido ("Finish")', () =>
+      this.finishButton.click()
+    );
   }
 
   /**

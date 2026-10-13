@@ -63,6 +63,13 @@ jobs:
         if: steps.cache-npm.outputs.cache-hit != 'true'
         run: npm ci
 
+      # ── 3b. Análisis estático: falla rápido, antes de lanzar navegadores ───
+      - name: Lint (ESLint + eslint-plugin-playwright)
+        run: npm run lint
+
+      - name: Typecheck (tsc --noEmit)
+        run: npm run typecheck
+
       # ── 4. Cache navegadores Playwright ───────────────────────────────────
       - name: Cache Playwright browsers
         uses: actions/cache@v4
@@ -105,6 +112,16 @@ jobs:
       - name: 'Tests :: checkout'
         id: checkout
         run: npx playwright test tests/checkout.spec.ts ${{ steps.cfg.outputs.flag }}
+        continue-on-error: true
+        env:
+          CI: 'true'
+
+      # Calidad: accesibilidad, rendimiento y defectos conocidos.
+      # La regresión visual (tests/visual.spec.ts) NO se ejecuta en CI: sus
+      # capturas de referencia son de Windows y el runner es Linux.
+      - name: 'Tests :: quality'
+        id: quality
+        run: npx playwright test tests/accessibility.spec.ts tests/performance.spec.ts tests/known-issues.spec.ts ${{ steps.cfg.outputs.flag }}
         continue-on-error: true
         env:
           CI: 'true'
@@ -185,6 +202,7 @@ jobs:
           AUTH_ICON=$(icon "${{ steps.auth.outcome }}")
           INV_ICON=$(icon  "${{ steps.inventory.outcome }}")
           CHK_ICON=$(icon  "${{ steps.checkout.outcome }}")
+          QA_ICON=$(icon   "${{ steps.quality.outcome }}")
 
           cat >> $GITHUB_STEP_SUMMARY <<EOF
           ## 🎭 Playwright Test Results
@@ -194,6 +212,7 @@ jobs:
           | Authentication | ${AUTH_ICON} \`${{ steps.auth.outcome }}\`      |
           | Inventory      | ${INV_ICON} \`${{ steps.inventory.outcome }}\` |
           | Checkout       | ${CHK_ICON} \`${{ steps.checkout.outcome }}\`  |
+          | Quality        | ${QA_ICON} \`${{ steps.quality.outcome }}\`   |
 
           **Navegador:** \`${{ steps.cfg.outputs.browser }}\`
           **Entorno:** \`${{ steps.cfg.outputs.environment }}\`
@@ -208,7 +227,8 @@ jobs:
         run: |
           if [ "${{ steps.auth.outcome }}"      != "success" ] || \
              [ "${{ steps.inventory.outcome }}" != "success" ] || \
-             [ "${{ steps.checkout.outcome }}"  != "success" ]; then
+             [ "${{ steps.checkout.outcome }}"  != "success" ] || \
+             [ "${{ steps.quality.outcome }}"   != "success" ]; then
             echo "::error::Una o más suites de tests han fallado."
             exit 1
           fi
